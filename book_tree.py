@@ -1,5 +1,7 @@
 """Quantyze book tree.
 
+Module Description
+==================
 This module contains the binary search tree used to store order-book price
 levels for Quantyze. Each node in the tree is a PriceLevel, and the tree
 supports efficient insertion, lookup, deletion, and best-price access.
@@ -11,6 +13,9 @@ market:
 
 This module is responsible only for the tree structure itself. It does not
 handle order matching, transaction logging, or dataset parsing.
+
+Copyright Information
+===============================
 
 Copyright (c) 2026 Cade McNelly, Nicolas Miranda Cantanhede,
 Sahand Samadirand
