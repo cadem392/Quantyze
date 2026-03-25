@@ -38,6 +38,7 @@ class _Node:
         self.prev = None
         self.next = None
 
+
 class Queue:
     """FIFO queue for ``PriceLevel.orders``: head dequeue, tail enqueue, dict for id lookup."""
 
