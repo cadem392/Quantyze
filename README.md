@@ -8,19 +8,6 @@ for bids and one for asks, with FIFO order queues at each price.
 
 This repository is currently in active development.
 
-Implemented or partially implemented:
-- core `BookTree` BST structure
-- `PriceLevel` queue-backed price nodes
-- initial `MatchingEngine` flow and fill-record logic
-- project architecture and class reference documentation
-
-Still under active development:
-- `OrderBook` integration and cancellation flow
-- `Order` and `Event` behavior methods
-- CSV loading and synthetic event generation
-- event streaming, UI wiring, and `main.py` orchestration
-- optional ML module training and inference flow
-
 ## Repository Layout
 
 The assignment expects a flat top-level layout. The main source files are:
@@ -57,13 +44,6 @@ The intended runtime flow is:
 6. Each `PriceLevel` maintains FIFO time priority for resting orders.
 7. Executions are written to in-memory logs and later flushed for analysis.
 
-## Development Notes
-
-- Python cache files and IDE metadata are intentionally ignored.
-- Keep source files at the repository root to match the assignment structure.
-- Avoid committing generated cache files or local editor configuration.
-- When teammates are working in parallel, coordinate module ownership to avoid
-  overlapping edits in `orders.py`, `order_book.py`, and `matching_engine.py`.
 
 ## Current Validation
 
