@@ -88,8 +88,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--no-ui",
-        type=str,
-        default=None,
+        action="store_true",
         help="Skip the Flask or UI server"
     )
 
@@ -114,7 +113,7 @@ def build_system(args: argparse.Namespace) -> tuple[OrderBook, MatchingEngine, E
     elif args.scenario is not None:
         events = loader.generate_synthetic(args.scenario)
     else:
-        events = loader.generate_synthetic("balanced") # default scenario
+        events = loader.generate_synthetic("balanced")  # default scenario
 
     stream = EventStream(events, engine, args.speed)
 
@@ -182,8 +181,6 @@ def train_model(data_path: str) -> None:
     trainer.save("model.pt")
 
 
-
-
 def start_flask(app, port: int) -> None:
     """Start the Quantyze Flask application on the given port.
 
@@ -192,12 +189,37 @@ def start_flask(app, port: int) -> None:
     """
 
 
-def print_summary(engine: MatchingEngine, agent: Agent) -> None:
+def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
     """Print a summary of the completed Quantyze run.
 
     The summary may include execution metrics from the matching engine and any
     available ML-related results, such as the agent's total P&L.
     """
+
+    metrics = engine.compute_metrics()
+    spread = engine.book.spread()
+    mid_price = engine.book.mid_price()
+
+    print("Quantyze Summary")
+    print("Here are some matching engine metrics")
+
+    print(f"Total Filled: {metrics["total_filled"]}")
+    print(f"Fill Count: {metrics["fill_count"]}")
+    print(f"Cancel Count: {metrics["cancel_count"]}")
+    print(f"Average Slippage: {metrics["average_slippage"]}")
+
+    if spread is None:
+        print("Spread: Unavailable")
+    else:
+        print(f"Spread: {spread}")
+
+    if mid_price is None:
+        print("Mid Price: Unavailable")
+    else:
+        print(f"Mid Price: {mid_price}")
+
+    if agent is not None:
+        print(f"Total P&L: {agent.total_pnl()}")
 
 
 def main() -> None:
@@ -207,6 +229,20 @@ def main() -> None:
     requested runtime mode, executes the simulation or training flow, and
     prints final summary information.
     """
+
+    args = parse_args()
+
+    if args.train:
+        if args.data is None:
+            raise ValueError
+
+        train_model(args.data)
+        return
+    else:
+        book, engine, stream, agent = build_system(args)
+        run_simulation(stream, agent, book)
+
+        print_summary(engine, agent)
 
 
 if __name__ == "__main__":
