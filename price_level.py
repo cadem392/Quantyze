@@ -136,7 +136,7 @@ class PriceLevel:
     left: PriceLevel | None
     right: PriceLevel | None
 
-    def __init__(self, price: float, orders: Queue | None = None, volume: float = 0.0) -> None:
+    def __init__(self, price: float, orders: Queue | None = None, volume: float = 0.0, parent_price: float = None) -> None:
         """Initialise a level at ``price``; allocate a new ``Queue`` when ``orders`` is omitted."""
 
         self.price = price
@@ -144,6 +144,7 @@ class PriceLevel:
         self.volume = volume
         self.left = None
         self.right = None
+        self._parent_price = parent_price
 
     def __repr__(self) -> str:
         """Return a short debug string with price, queue, and level state."""
@@ -195,7 +196,16 @@ class PriceLevel:
 
         return self.orders.peek_id(order_id)
 
-    def consume_order_by_volume(self, volume: float) -> None:
-        """Consume ``volume`` units from the front of the queue (partial/full pops)."""
+    def depth_snapshot(self, levels) -> list[tuple[float, float]]:
+        """Return a list of (price, volume) tuples describing each price level until a certain depth."""
 
-        raise NotImplementedError
+        if (self.left is None and self.right is None) or levels == 0:
+            return []
+        else:
+            snapshot = [(self.price, self.volume)]
+            if self.left is not None:
+                snapshot.extend(self.left.depth_snapshot(levels - 1))
+            if self.right is not None:
+                snapshot.extend(self.right.depth_snapshot(levels - 1))
+
+            return snapshot

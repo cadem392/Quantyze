@@ -21,6 +21,8 @@ from book_tree import BookTree
 from orders import Order
 from price_level import PriceLevel
 
+import json
+
 
 class OrderBook:
     """Full limit order book: bid BST, ask BST, order index, and trade log.
@@ -40,8 +42,8 @@ class OrderBook:
     def __init__(self):
         """Create bid and ask BookTrees and empty order_index and trade_log."""
 
-        self.bids = BookTree()
-        self.asks = BookTree()
+        self.bids = BookTree('bid')
+        self.asks = BookTree('ask')
         self.order_index = {}
         self.trade_log = []
 
@@ -53,10 +55,21 @@ class OrderBook:
     def add_limit_order(self, order: Order) -> None:
         """Insert the order into the bid or ask BST at its limit price and register it in order_index."""
 
+        price_level = PriceLevel(order.price)
+        price_level.add_order(order)
+
+        self.order_index[order.order_id] = order
+
         if order.side == 'buy':
-            self.bids.insert(order)
+            if self.bids.is_empty() or order.price not in self.bids:
+                self.bids.insert(price_level)
+            else:
+                self.bids[order.price].add_order(order)
         else:
-            self.asks.insert(order)
+            if self.asks.is_empty() or order.price not in self.asks:
+                self.asks.insert(price_level)
+            else:
+                self.asks[order.price].add_order(order)
 
     def cancel_order(self, order_id: str) -> bool:
         """Look up order_id in order_index, mark the order cancelled, remove it from
@@ -64,7 +77,26 @@ class OrderBook:
         cancellation succeeded.
         """
 
-        raise NotImplementedError()
+        if order_id in self.order_index:
+            order = self.order_index[order_id]
+
+            if order.price in self.bids:
+                self.bids[order.price].pop_order_id(order_id)
+
+                if self.bids[order.price].orders.is_empty():
+                    self.bids.delete(order.price)
+
+                return True
+
+            elif order.price in self.asks:
+                self.asks[order.price].pop_order_id(order_id)
+
+                if self.asks[order.price].orders.is_empty():
+                    self.asks.delete(order.price)
+
+                return True
+
+        return False
 
     def best_bid(self) -> PriceLevel | None:
         """Return the PriceLevel at the best (highest) bid price, or None if empty."""
@@ -95,14 +127,20 @@ class OrderBook:
         ``(price, volume)`` tuples suitable for charts and API responses.
         """
 
-        raise NotImplementedError()
+        return {
+            "bids": self.bids.root.depth_snapshot(levels),
+            "asks": self.asks.root.depth_snapshot(levels)
+        }
 
     def log_trade(self, record: dict) -> None:
         """Append one execution record dict to the in-memory trade_log."""
 
-        raise NotImplementedError()
+        self.trade_log.append(record)
 
     def flush_log(self, path: str) -> None:
         """Serialize trade_log to ``path`` (e.g. log.json) and clear the in-memory log."""
 
-        raise NotImplementedError()
+        with open(path, 'w') as f:
+            json.dump(self.trade_log, f)
+
+        self.trade_log.clear()
