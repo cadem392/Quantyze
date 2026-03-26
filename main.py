@@ -29,6 +29,9 @@ from __future__ import annotations
 
 import argparse
 
+import torch
+from torch.utils.data import DataLoader as TorchDataLoader, TensorDataset
+
 from data_loader import DataLoader
 from event_stream import EventStream
 from matching_engine import MatchingEngine
@@ -123,13 +126,24 @@ def build_system(args: argparse.Namespace) -> tuple[OrderBook, MatchingEngine, E
     return book, engine, stream, agent
 
 
-def run_simulation(stream: EventStream, agent: Agent, book: OrderBook) -> None:
+def run_simulation(stream: EventStream, agent: Agent | None, book: OrderBook) -> None:
     """Run the main Quantyze simulation flow.
 
     This function processes the event stream through the matching engine and
     allows any optional agent logic to observe or react to the evolving order
     book state.
     """
+
+    if agent is None:
+        stream.run_all()
+        return
+
+    for event in stream.source:
+        fills = stream.emit(event)
+
+        if fills != []:
+            last_fill_price = fills[-1]["exec_price"]
+            agent.step(book, last_fill_price)
 
 
 def train_model(data_path: str) -> None:
@@ -138,6 +152,36 @@ def train_model(data_path: str) -> None:
     This function loads training data, constructs the neural-network training
     objects, and saves model weights for later inference.
     """
+
+    data_loader = DataLoader(data_path)
+    events = data_loader.load_csv()
+
+    if events == []:
+        raise ValueError("No training events were loaded from the given data path.")
+
+    features = data_loader.to_feature_matrix()
+    labels = data_loader.to_label_vector()
+
+    feature_tensor = torch.tensor(features, dtype=torch.float32)
+    label_tensor = torch.tensor(labels, dtype=torch.long)
+
+    dataset = TensorDataset(feature_tensor, label_tensor)
+
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+
+    train_dataset, val_dataset = torch.utils.data.random_split(
+        dataset, [train_size, val_size])
+
+    train_loader = TorchDataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = TorchDataLoader(val_dataset, batch_size=32, shuffle=False)
+
+    model = OrderBookNet(feature_dim=features.shape[1])
+    trainer = Trainer(model)
+    trainer.fit(train_loader, val_loader)
+    trainer.save("model.pt")
+
+
 
 
 def start_flask(app, port: int) -> None:
