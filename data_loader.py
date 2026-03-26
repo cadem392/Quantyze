@@ -101,3 +101,8 @@ class DataLoader:
         - self.events != []
         """
         pass
+
+    def to_label_vector(self) -> np.ndarray:
+        """Convert this loader's events into a NumPy label vector."""
+
+        pass
