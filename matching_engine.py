@@ -29,7 +29,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from order_book import OrderBook
-from orders import Event, Order
+from orders import Event, IncomingOrder, Order
 from price_level import PriceLevel
 
 
@@ -87,7 +87,7 @@ class MatchingEngine:
         If residual quantity remains, rest the order in the appropriate tree.
         """
 
-        incoming = Order(event)
+        incoming = IncomingOrder(event)
         fills = []
 
         if incoming.side == "buy":
@@ -115,7 +115,18 @@ class MatchingEngine:
                 best_bid = self.book.best_bid()
 
         if not incoming.is_complete():
-            self.book.add_limit_order(incoming)
+            resting_event = Event(
+                incoming.timestamp,
+                incoming.order_id,
+                incoming.side,
+                "limit",
+                incoming.price,
+                incoming.remaining_qty
+            )
+            self.book.add_limit_order(Order(resting_event))
+
+        if fills != []:
+            self.metrics["total_slippage"] += self._calc_slippage(incoming.price, fills)
 
         return fills
 
@@ -126,11 +137,12 @@ class MatchingEngine:
         until the order is fully filled or the book is empty.
         """
 
-        incoming = Order(event)
+        incoming = IncomingOrder(event)
         fills = []
 
         if incoming.side == "buy":
             best_ask = self.book.best_ask()
+            expected_price = best_ask.price if best_ask is not None else None
 
             while not incoming.is_complete() and best_ask is not None:
                 fills.extend(self._match(incoming, best_ask))
@@ -138,11 +150,15 @@ class MatchingEngine:
                 best_ask = self.book.best_ask()
         else:
             best_bid = self.book.best_bid()
+            expected_price = best_bid.price if best_bid is not None else None
 
             while not incoming.is_complete() and best_bid is not None:
                 fills.extend(self._match(incoming, best_bid))
                 self._clean_empty_levels()
                 best_bid = self.book.best_bid()
+
+        if fills != [] and expected_price is not None:
+            self.metrics["total_slippage"] += self._calc_slippage(expected_price, fills)
 
         return fills
 
@@ -153,7 +169,7 @@ class MatchingEngine:
         if cancelled:
             self.metrics["cancel_count"] += 1
 
-    def _match(self, incoming: Order, level: PriceLevel) -> list[dict]:
+    def _match(self, incoming: IncomingOrder, level: PriceLevel) -> list[dict]:
         """Match <incoming> against the FIFO queue at <level>.
 
         Produce fill records until either the incoming order is complete or the
@@ -164,25 +180,28 @@ class MatchingEngine:
 
         while not (incoming.is_complete() or level.is_empty()):
             maker = level.peek_order()
-
             filled_qty = min(incoming.remaining_qty, maker.remaining_qty)
+
             incoming.fill(filled_qty)
             maker.fill(filled_qty)
+            level.update_volume(-filled_qty)
 
             fill_record = self._build_fill_record(maker, incoming, filled_qty, level.price)
             fills.append(fill_record)
             self.execution_log.append(fill_record)
+            self.book.log_trade(fill_record)
 
             self.metrics["total_filled"] += filled_qty
             self.metrics['fill_count'] += 1
 
             if maker.is_complete():
                 level.pop_order()
+                self.book.order_index.pop(maker.order_id, None)
 
         return fills
 
     @staticmethod
-    def _build_fill_record(maker: Order, taker: Order, quantity: float,
+    def _build_fill_record(maker: Order, taker: IncomingOrder, quantity: float,
                            price: float) -> dict:
         """Return a fill record for a single maker-taker execution."""
 
@@ -231,7 +250,7 @@ class MatchingEngine:
             self.book.bids.delete(best_bid.price)
             best_bid = self.book.best_bid()
 
-        while best_bid is not None and best_bid.is_empty():
+        while best_ask is not None and best_ask.is_empty():
             self.book.asks.delete(best_ask.price)
             best_ask = self.book.best_ask()
 
@@ -240,7 +259,7 @@ class MatchingEngine:
 
         metrics_copy = self.metrics.copy()
 
-        if self.execution_log == []:
+        if metrics_copy["fill_count"] == 0:
             metrics_copy["average_slippage"] = 0.0
         else:
             total_slippage = metrics_copy["total_slippage"]
@@ -257,4 +276,3 @@ class MatchingEngine:
             f"fill_count={self.metrics['fill_count']}, "
             f"cancel_count={self.metrics['cancel_count']})"
         )
-
