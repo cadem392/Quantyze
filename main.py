@@ -202,8 +202,8 @@ def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
     spread = engine.book.spread()
     mid_price = engine.book.mid_price()
 
-    print("Quantyze Summary")
-    print("Here are some matching engine metrics")
+    print("Quantyze Summary: Matching Engine Metrics")
+    print("="*30)
 
     print(f"Total Filled: {metrics['total_filled']}")
     print(f"Fill Count: {metrics['fill_count']}")
@@ -222,6 +222,8 @@ def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
 
     if agent is not None:
         print(f"Total P&L: {agent.total_pnl()}")
+
+    print("=" * 30)
 
 
 def main() -> None:

@@ -23,6 +23,7 @@ Sahand Samadirand
 from __future__ import annotations
 
 import os
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -175,10 +176,19 @@ class Agent:
         self.pnl_log = []
         self._model_path = model_path
 
-        if os.path.exists(model_path):
-            state = torch.load(model_path, map_location=torch.device("cpu"))
-            self.model.load_state_dict(state)
-            self.model.eval()
+        self.model.eval()
+
+        if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
+            try:
+                state = torch.load(model_path, map_location=torch.device("cpu"))
+                self.model.load_state_dict(state)
+                self.model.eval()
+            except (EOFError, OSError, RuntimeError, ValueError) as exc:
+                warnings.warn(
+                    f"Could not load checkpoint from {model_path!r}; using an untrained model instead. "
+                    f"Reason: {exc}",
+                    RuntimeWarning,
+                )
 
     def observe(self, book: OrderBook) -> np.ndarray:
         """Extract the feature vector (spread, depth bands, mid, imbalance, etc.)."""
@@ -238,8 +248,4 @@ def build_features(book: OrderBook) -> np.ndarray:
 def load_agent(path: str) -> Agent:
     """Construct Agent and load weights from ``path`` for inference."""
 
-    agent = Agent(model_path=path)
-    state = torch.load(path, map_location=torch.device("cpu"))
-    agent.model.load_state_dict(state)
-    agent.model.eval()
-    return agent
+    return Agent(model_path=path)
