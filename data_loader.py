@@ -112,7 +112,9 @@ class DataLoader:
         except ValueError as e:
             raise ValueError(f"Invalid data format: {e}")
 
-        return Event(timestamp, order_id, side, order_type, price, quantity)
+        event = Event(timestamp, order_id, side, order_type, price, quantity)
+        event.validate()
+        return event
 
     def generate_synthetic(self, scenario: str, n: int = 1000) -> list[Event]:
         """Generate and store n synthetic events for the given market scenario.
@@ -336,4 +338,3 @@ class DataLoader:
             labels.append(label)
 
         return np.array(labels, dtype=int)
-

@@ -148,7 +148,7 @@ class OrderBook:
         if self.bids.root is None:
             bid_levels = []
         else:
-            bid_levels = list(reversed(self.bids.root.depth_snapshot(levels)))
+            bid_levels = list(reversed(self.bids.root.depth_snapshot(len(self.bids))))[:levels]
 
         if self.asks.root is None:
             ask_levels = []

@@ -206,7 +206,7 @@ class MatchingEngine:
         """Return a fill record for a single maker-taker execution."""
 
         return {
-            "timestamp": taker.timestamp,
+            "timestamp": taker.timestamp.isoformat(),
             "maker_order_id": maker.order_id,
             "taker_order_id": taker.order_id,
             "side": taker.side,
